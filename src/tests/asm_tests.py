@@ -128,14 +128,11 @@ def emulate_asm_btb_assign(in1, debug=False):
     emulator.emulate()
 
     emulator.logger.log(f"Output value: {emulator.cache.is_cached(output_address)}")
-    
-    # Optional : print BTB statistics to verify training/misprediction
-    emulator.btb.print_stats()
 
     return emulator.cache.is_cached(output_address)
 
 def emulate_asm_btb_or(in1, in2, debug=False):
-    code = get_asm_exception_btb_or(in1, in2)
+    code = get_asm_btb_or(in1, in2)
     loader = AsmLoader(code)
     emulator = MuWMEmulator(name='btb_or', loader=loader, debug=debug)
 
@@ -156,7 +153,7 @@ def emulate_asm_btb_or(in1, in2, debug=False):
     return emulator.cache.is_cached(output_address)
 
 def emulate_asm_btb_and(in1, in2, debug=False):
-    code = get_asm_exception_btb_and(in1, in2)
+    code = get_asm_btb_and(in1, in2)
     loader = AsmLoader(code)
     emulator = MuWMEmulator(name='btb_and', loader=loader, debug=debug)
 
@@ -177,7 +174,7 @@ def emulate_asm_btb_and(in1, in2, debug=False):
     return emulator.cache.is_cached(output_address)
 
 def emulate_asm_btb_and_or(in1, in2, in3, debug=False):
-    code = get_asm_exception_btb_and_or(in1, in2, in3)
+    code = get_asm_btb_and_or(in1, in2, in3)
     loader = AsmLoader(code)
     emulator = MuWMEmulator(name='btb_and_or', loader=loader, debug=debug)
 
