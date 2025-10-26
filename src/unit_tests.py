@@ -311,6 +311,26 @@ def test_flexo_alu():
 #         all_passed = False
 #     return all_passed
 
+##########################################
+# ASM BTB tests
+##########################################
+
+def test_asm_btb_assign() -> bool:
+    verifier = lambda a: a
+    return run_gate_test('ASSIGN', emulate_asm_btb_assign, verifier, 1)
+
+def test_asm_btb_and() -> bool:
+    verifier = lambda a, b: a and b
+    return run_gate_test('AND', emulate_asm_btb_and, verifier, 2)
+
+def test_asm_btb_or() -> bool:
+    verifier = lambda a, b: a or b
+    return run_gate_test('OR', emulate_asm_btb_or, verifier, 2)
+
+def test_asm_btb_and_or() -> bool:
+    verifier = lambda a, b, c: (a and b) or c
+    return run_gate_test('AND-OR', emulate_asm_btb_and_or, verifier, 3)
+
 
 ##########################################
 # HELPER FUNCTIONS
