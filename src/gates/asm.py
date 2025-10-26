@@ -131,3 +131,193 @@ def get_asm_exception_not(in1):
         res += "mov [r13], byte 0\n"
     res += ASM_EXCEPTION_NOT
     return res
+
+# BTB-based gates :
+
+BTB_TRAINING_ITERATIONS = 10
+
+ASM_BTB_ASSIGN = f"""
+mov rcx, {BTB_TRAINING_ITERATIONS}
+lea rax, [rel assign_predicted_target]
+jmp assign_indirect_jump
+
+assign_training_loop:
+    lea rax, [rel assign_predicted_target]
+
+assign_indirect_jump:
+    jmp rax                                    ; indirect jump used by training and misprediction
+
+assign_predicted_target:
+    test rcx, rcx                              ; set zero flag based on rcx
+    jz assign_transient                        ; if rcx = 0, jump to transient execution
+    dec rcx                                    ; otherwise, decrease rcx
+    jnz assign_training_loop                   ; then make one training iteration
+    lea rax, [rel assign_misprediction_target] ; when training is done, fallthrough here
+    jmp assign_indirect_jump                   ; make one more iteration, but with rcx = 0
+
+assign_transient:
+    movzx rcx, byte [r14]
+    mov rdx, rcx
+    add rdx, r15
+    mov dl, byte [rdx]
+    jmp $
+
+assign_misprediction_target:
+    nop
+"""
+
+def get_asm_btb_assign(in1):
+    res = ASM_START
+    if in1:
+        res += "mov [r14], byte 0\n"
+    res += ASM_BTB_ASSIGN
+    return res
+
+ASM_BTB_OR = f"""
+mov rcx, {BTB_TRAINING_ITERATIONS}
+lea rax, [rel or_predicted_target]
+jmp or_indirect_jump
+
+or_training_loop:
+    lea rax, [rel or_predicted_target]
+
+or_indirect_jump:
+    jmp rax                               ; indirect jump used by training and misprediction
+
+or_predicted_target:
+    test rcx, rcx                          ; set zero flag based on rcx
+    jz or_transient                        ; if rcx = 0, jump to transient execution
+    dec rcx                                ; otherwise, decrease rcx
+    jnz or_training_loop                   ; then make one training iteration
+    lea rax, [rel or_misprediction_target] ; when training is done, fallthrough here
+    jmp or_indirect_jump                   ; make one more iteration, but with rcx = 0
+
+or_transient:
+    movzx rcx, byte [r14]
+    mov rdx, rcx
+    add rdx, r15
+    mov dl, byte [rdx]
+    jmp $
+
+or_misprediction_target:
+    nop
+"""
+
+def get_asm_btb_or(in1, in2):
+    res = ASM_START
+    if in1: 
+        res += "mov [r13], byte 0\n"
+    if in2:
+        res += "mov [r14], byte 0\n"
+    res += ASM_BTB_OR
+    return res
+
+ASM_BTB_AND = f"""
+mov rcx, {BTB_TRAINING_ITERATIONS}
+lea rax, [rel and_predicted_target]
+jmp and_indirect_jump
+
+and_training_loop:
+    lea rax, [rel and_predicted_target]
+
+and_indirect_jump:
+    jmp rax                                 ; indirect jump used by training and misprediction
+
+and_predicted_target:
+    test rcx, rcx                           ; set zero flag based on rcx
+    jz and_transient                        ; if rcx = 0, jump to transient execution
+    dec rcx                                 ; otherwise, decrease rcx
+    jnz and_training_loop                   ; then make one training iteration
+    lea rax, [rel and_misprediction_target] ; when training is done, fallthrough here
+    jmp and_indirect_jump                   ; make one more iteration, but with rcx = 0
+
+and_transient:
+    movzx rcx, byte [r14]
+    mov rdx, rcx
+    add rdx, r15
+    mov dl, byte [rdx]
+    jmp $
+
+and_misprediction_target:
+    nop
+"""
+
+ASM_BTB_AND_GITM = f"""
+mov rcx, {BTB_TRAINING_ITERATIONS}
+lea rax, [rel and_gitm_predicted_target]
+jmp and_gitm_indirect_jump
+
+and_gitm_training_loop:
+    lea rax, [rel and_gitm_predicted_target]
+
+and_gitm_indirect_jump:
+    jmp rax                                      ; indirect jump used by training and misprediction
+
+and_gitm_predicted_target:
+    test rcx, rcx                                ; set zero flag based on rcx
+    jz and_gitm_transient                        ; if rcx = 0, jump to transient execution
+    dec rcx                                      ; otherwise, decrease rcx
+    jnz and_gitm_training_loop                   ; then make one training iteration
+    lea rax, [rel and_gitm_misprediction_target] ; when training is done, fallthrough here
+    jmp and_gitm_indirect_jump                   ; make one more iteration, but with rcx = 0
+
+and_gitm_transient:
+    movzx rcx, byte [r14]
+    mov rdx, rcx
+    add rdx, r15
+    mov dl, byte [rdx]
+    jmp $
+
+and_gitm_misprediction_target:
+    nop
+"""
+
+def get_asm_btb_and(in1, in2):
+    res = ASM_START
+    if in1: 
+        res += "mov [r13], byte 0\n"
+    if in2:
+        res += "mov [r14], byte 0\n"
+    res += ASM_BTB_AND
+    return res
+
+ASM_BTB_AND_OR = f"""
+mov rcx, {BTB_TRAINING_ITERATIONS}
+lea rax, [rel and_or_predicted_target]
+jmp and_or_indirect_jump
+
+and_or_training_loop:
+    lea rax, [rel and_or_predicted_target]
+
+and_or_indirect_jump:
+    jmp rax                                    ; indirect jump used by training and misprediction
+
+and_or_predicted_target:
+    test rcx, rcx                              ; set zero flag based on rcx
+    jz and_or_transient                        ; if rcx = 0, jump to transient execution
+    dec rcx                                    ; otherwise, decrease rcx
+    jnz and_or_training_loop                   ; then make one training iteration
+    lea rax, [rel and_or_misprediction_target] ; when training is done, fallthrough here
+    jmp and_or_indirect_jump                   ; make one more iteration, but with rcx = 0
+
+and_or_transient:
+    movzx rcx, byte [r14]
+    mov rdx, rcx
+    add rdx, r15
+    mov dl, byte [rdx]
+    jmp $
+
+and_or_misprediction_target:
+    nop
+"""
+
+def get_asm_btb_and_or(in1, in2, in3):
+    res = ASM_START
+    if in1: 
+        res += "mov [r13], byte 0\n"
+    if in2:
+        res += "mov [r14], byte 0\n"
+    if in3:
+        res += "mov [r12], byte 0\n"
+    res += ASM_BTB_AND_OR
+    return res
