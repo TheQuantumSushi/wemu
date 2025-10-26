@@ -5,6 +5,7 @@ from typing import List, Tuple, Dict, ByteString
 from logger import Logger
 from cache import *
 from rsb import RSB
+from BTB import BTB
 from read_timer import Timer
 from loader import *
 from capstone import Cs, CS_ARCH_X86, CS_MODE_64, CsInsn
@@ -24,6 +25,13 @@ class MuWMEmulator():
     REGULAR_INSTR_CYCLES = 1  # Regular instruction timing
     MAX_SPEC_WINDOW = 250
 
+    # btb
+    BTB_NUM_ENTRIES = 4096
+    BTB_ASSOCIATIVITY = 4
+    BTB_TAG_BITS = 16
+    BTB_CONFIDENCE_COUNTER_BITS = 2
+    BTB_DEFAULT_CONFIDENCE = 1
+
     def __init__(self, name: str, loader: Loader, cache: Cache = None, debug: bool = True):
         # initialize unicorn
         self.uc = Uc(UC_ARCH_X86, UC_MODE_64)
@@ -37,6 +45,9 @@ class MuWMEmulator():
 
         # rsb
         self.rsb = RSB()
+
+        # btb
+        self.btb = BTB(num_entries = BTB_NUM_ENTRIES, associativity = BTB_ASSOCIATIVITY, tag_bits = BTB_TAG_BITS, confidence_counter_bits = BTB_CONFIDENCE_COUNTER_BITS, default_confidence = BTB_DEFAULT_CONFIDENCE)
 
         self.round_count: List[int] = None  # used for sha1_block emulation
 
@@ -121,6 +132,19 @@ class MuWMEmulator():
         self.in_speculation = True
         self.speculation_limit = self.MAX_SPEC_WINDOW
 
+    def speculate_btb_misprediction(self, actual_target: int, predicted_target: int):
+        self.checkpoint(self.uc, actual_target)
+        self.uc.reg_write(UC_X86_REG_RIP, predicted_target)
+        
+        self.in_speculation = True
+        self.speculation_limit = self.MAX_SPEC_WINDOW
+        
+        # Extend transient window duration based on number of pending cache miss dependencies :
+        regs_read, _ = self.curr_insn.regs_access()
+        if self.check_register_dep(regs_read, self.pending_cache_misses):
+            self.speculation_limit += self.CACHE_MISS_CYCLES
+            self.log(f"\tExtending speculation window by {self.CACHE_MISS_CYCLES} cycles (branch depends on pending cache miss)")
+
     def handle_fault(self, errno: int) -> int:
         next_addr = self.speculate_fault(errno)
         if next_addr:
@@ -155,11 +179,78 @@ class MuWMEmulator():
                 self.finish_emulation()
                 return
 
-            if insn.mnemonic == "call":
-                return_addr = address + insn.size
-                self.log(f"\tCall instruction detected, adding to RSB: 0x{return_addr:x}")
+            if insn.mnemonic in ["call", "jmp"]:
+                if len(insn.operands) > 0:
+                    op = insn.operands[0]
+                    
+                    # Check if branch jump is indirect (to register or memory operand) :
+                    is_indirect = op.type in [X86_OP_REG, X86_OP_MEM]
+                    
+                    # If branch jump is indirect, use BTB :
+                    if is_indirect:
 
-                self.rsb.add_ret_addr(return_addr)
+                        # Indirect calls also update RSB :
+                        if insn.mnemonic == "call":
+                            return_addr = address + insn.size
+                            self.rsb.add_ret_addr(return_addr)
+
+                        # Check for BTB prediction :
+                        predicted_address = self.btb.predict(address)
+                        self.log(f"\tIndirect {insn.mnemonic} detected at 0x{address:x}")
+                        self.log(f"\tBTB prediction: {'0x{:x}'.format(predicted_address) if predicted_address is not None else 'None (miss)'}")
+
+                        # Get the actual target address :
+                        if op.type == X86_OP_REG: # register indirect branch
+                            reg_id = op.reg # register used
+                            actual_target_address = uc.reg_read(reg_id) # value from register
+                        else: # memory indirect branch
+                            # Calculate where in memory to look :
+                            base_value = 0
+                            if op.mem.base != 0:
+                                if op.mem.base == X86_REG_RIP:
+                                    base_value = address + insn.size # RIP-relative
+                                else:
+                                    base_value = uc.reg_read(op.mem.base)
+                            
+                            index_value = 0
+                            if op.mem.index != 0:
+                                index_value = uc.reg_read(op.mem.index) * op.mem.scale
+                            
+                            effective_addr = base_value + index_value + op.mem.disp
+                            
+                            # Read the target from that memory location :
+                            actual_target_address = int.from_bytes(uc.mem_read(effective_addr, 8), byteorder='little')
+
+                        self.log(f"\tActual target: 0x{actual_target_address:x}")
+                        
+                        # Update the BTB's entry (either create a new one, or update confidence/target address) :
+                        # NB : it is fine to do it now as we base the next instructions on the old values, before
+                        # update. On real hardware, this is done after resolution, but doesn't impact our simulation here.
+                        self.btb.update(branch_address = address, actual_target = actual_target_address)
+
+                        # Check if it was a BTB hit or miss :
+                        if predicted_address is not None: # hit
+                            self.log(f"\tBTB hit for address 0x{address:x}, predicting 0x{predicted_address:x}")
+                            # Check if it is a misprediction or not :
+                            if predicted_address == actual_target_address: # correct prediction
+                                self.log(f"\tBTB correct prediction for address 0x{address:x}, predicting 0x{predicted_address:x}")
+                            else: # misprediction
+                                # Trigger transient window :
+                                self.log(f"\tBTB misprediction detected ! From address 0x{address:x}, predicted : 0x{predicted_address:x}, correct : 0x{actual_target_address:x}")
+                                self.speculate_btb_misprediction(actual_target_address, predicted_address)
+
+                                return
+
+                        else: # miss
+                            self.log(f"\tBTB miss for address 0x{address:x}")
+                    
+                    # Otherwise, direct calls still update RSB :
+                    else:
+                        if insn.mnemonic == "call":
+                            return_addr = address + insn.size
+                            self.rsb.add_ret_addr(return_addr)
+
+                return
             
             if insn.mnemonic == "ret":
                 predicted_ret_addr = self.rsb.pop_ret_addr()
