@@ -5,7 +5,7 @@ from typing import List, Tuple, Dict, ByteString
 from logger import Logger
 from cache import *
 from rsb import RSB
-from BTB import BTB
+from btb import BTB
 from read_timer import Timer
 from loader import *
 from capstone import Cs, CS_ARCH_X86, CS_MODE_64, CsInsn
@@ -47,7 +47,7 @@ class MuWMEmulator():
         self.rsb = RSB()
 
         # btb
-        self.btb = BTB(num_entries = BTB_NUM_ENTRIES, associativity = BTB_ASSOCIATIVITY, tag_bits = BTB_TAG_BITS, confidence_counter_bits = BTB_CONFIDENCE_COUNTER_BITS, default_confidence = BTB_DEFAULT_CONFIDENCE)
+        self.btb = BTB(num_entries = self.BTB_NUM_ENTRIES, associativity = self.BTB_ASSOCIATIVITY, tag_bits = self.BTB_TAG_BITS, confidence_counter_bits = self.BTB_CONFIDENCE_COUNTER_BITS, default_confidence = self.BTB_DEFAULT_CONFIDENCE)
 
         self.round_count: List[int] = None  # used for sha1_block emulation
 
