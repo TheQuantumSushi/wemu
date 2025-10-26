@@ -160,7 +160,6 @@ assign_transient:
     mov rdx, rcx
     add rdx, r15
     mov dl, byte [rdx]
-    jmp $
 
 assign_misprediction_target:
     nop
@@ -197,7 +196,6 @@ or_transient:
     mov rdx, rcx
     add rdx, r15
     mov dl, byte [rdx]
-    jmp $
 
 or_misprediction_target:
     nop
@@ -236,7 +234,6 @@ and_transient:
     mov rdx, rcx
     add rdx, r15
     mov dl, byte [rdx]
-    jmp $
 
 and_misprediction_target:
     nop
@@ -266,7 +263,6 @@ and_gitm_transient:
     mov rdx, rcx
     add rdx, r15
     mov dl, byte [rdx]
-    jmp $
 
 and_gitm_misprediction_target:
     nop
@@ -305,7 +301,6 @@ and_or_transient:
     mov rdx, rcx
     add rdx, r15
     mov dl, byte [rdx]
-    jmp $
 
 and_or_misprediction_target:
     nop
