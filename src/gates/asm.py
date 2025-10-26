@@ -192,10 +192,13 @@ or_predicted_target:
     jmp or_indirect_jump                   ; make one more iteration, but with rcx = 0
 
 or_transient:
-    movzx rcx, byte [r14]
-    mov rdx, rcx
-    add rdx, r15
-    mov dl, byte [rdx]
+    movzx rcx, byte [r13] ; Load the first input byte into rcx
+    add rcx, r15          ; Add r15 (output base address) to rcx
+    mov al, byte [rcx]    ; Access memory at rcx, causing cache side effect
+
+    movzx rcx, byte [r14] ; Load the second input byte into rcx
+    add rcx, r15          ; Add r15 (output base address) to rcx
+    mov dl, byte [rcx]    ; Access memory at rcx, causing cache side effect
 
 or_misprediction_target:
     nop
@@ -230,10 +233,11 @@ and_predicted_target:
     jmp and_indirect_jump                   ; make one more iteration, but with rcx = 0
 
 and_transient:
-    movzx rcx, byte [r14]
-    mov rdx, rcx
-    add rdx, r15
-    mov dl, byte [rdx]
+    movzx rcx, byte [r13]    ; Load the first input byte into rcx
+    movzx rdx, byte [r14]    ; Load the second input byte into rdx
+    add rcx, rdx             ; Add both values (will be the address offset)
+    add rcx, r15             ; Add r15 (output base address) to rcx
+    mov al, byte [rcx]       ; Access memory at rcx, causing cache side effect
 
 and_misprediction_target:
     nop
@@ -259,10 +263,11 @@ and_gitm_predicted_target:
     jmp and_gitm_indirect_jump                   ; make one more iteration, but with rcx = 0
 
 and_gitm_transient:
-    movzx rcx, byte [r14]
-    mov rdx, rcx
-    add rdx, r15
-    mov dl, byte [rdx]
+    movzx rcx, byte [r13]    ; Load in1[0] into rcx
+    add rcx, r14             ; Add in2 base address to rcx
+    movzx rdx, byte [rcx]    ; Load in2[in1[0]] into rdx
+    add rdx, r15             ; Add out base address to rdx
+    mov dl, byte [rdx]       ; Access out[in2[in1[0]]], causing cache side effect
 
 and_gitm_misprediction_target:
     nop
@@ -297,10 +302,17 @@ and_or_predicted_target:
     jmp and_or_indirect_jump                   ; make one more iteration, but with rcx = 0
 
 and_or_transient:
-    movzx rcx, byte [r14]
-    mov rdx, rcx
-    add rdx, r15
-    mov dl, byte [rdx]
+    ; First part: compute In1[0] ∧ In2[0] and cache output if both are cached
+    movzx rcx, byte [r13]    ; Load the first input (In1) byte into rcx
+    movzx rdx, byte [r14]    ; Load the second input (In2) byte into rdx
+    add rcx, rdx             ; Address offset depends on both inputs (both must be cached)
+    add rcx, r15             ; Add output base address
+    mov al, byte [rcx]       ; Cache the value if both inputs are cached (AND part)
+
+    ; Second part: compute OR with In3[0]
+    movzx rcx, byte [r12]    ; Load the third input (In3) byte into rcx
+    add rcx, r15             ; Add output base address
+    mov al, byte [rcx]       ; Cache the value if In3 is cached (OR part)
 
 and_or_misprediction_target:
     nop
